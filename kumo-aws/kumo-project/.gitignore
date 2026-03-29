@@ -2,7 +2,7 @@ __pycache__/
 .vscode/
 .venv/
 uv.lock
-DS_Store
+.DS_Store
 
 # Log files
 *.log
@@ -19,3 +19,4 @@ build/
 
 # ML models
 *.pkl
+.env
