@@ -1,0 +1,21 @@
+__pycache__/
+.vscode/
+.venv/
+uv.lock
+DS_Store
+
+# Log files
+*.log
+
+# SAM build artifacts
+.aws-sam/
+
+# Python cache
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# ML models
+*.pkl

@@ -1,0 +1,6 @@
+services:
+  kumo:
+    image: ghcr.io/sivchari/kumo:latest
+    container_name: kumo
+    ports:
+      - "4566:4566"

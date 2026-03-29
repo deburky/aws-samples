@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: ML Prediction Service with Kumo
+
+Parameters:
+  Stage:
+    Type: String
+    Default: test
+    Description: Stage name for the API deployment
+
+Globals:
+  Function:
+    Timeout: 30
+    Environment:
+      Variables:
+        AWS_ENDPOINT_URL: http://localhost:4566
+
+Resources:
+  # Lambda Function
+  PredictFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      MemorySize: 512
+      Architectures:
+        - arm64
+      Events:
+        PredictAPI:
+          Type: Api
+          Properties:
+            Path: /predict
+            Method: post
+            RestApiId: !Ref PredictApi
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./src
+      DockerTag: python3.9-v1
+
+  # API Gateway
+  PredictApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      EndpointConfiguration: EDGE
+      Auth:
+        DefaultAuthorizer: NONE
+
+Outputs:
+  PredictEndpoint:
+    Description: API Gateway endpoint URL for Predict function
+    Value: !Sub http://localhost:4566/restapis/${PredictApi}/${Stage}/_user_request_/predict
+
+  TestCommand:
+    Description: Curl command to test the endpoint
+    Value: !Sub >-
+      curl -X POST http://localhost:4566/restapis/${PredictApi}/${Stage}/_user_request_/predict
+      -H 'Content-Type: application/json'
+      -d '{"features": [1.0, 2.0, 3.0, 4.0]}'
