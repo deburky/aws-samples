@@ -27,3 +27,12 @@ make stop         # Tear down all services
 ```
 
 **Tech stack:** Python, scikit-learn, AWS SAM, Docker, boto3, pytest
+
+### [appconfig_agent](./appconfig_agent)
+
+A generic Python package that ports AWS AppConfig Agent behavior:
+- Fetches raw configuration through the AppConfig management API
+- Evaluates variant/rule expressions locally for feature-flag resolution
+- Includes cache + backup fallback logic for resilient reads
+
+**Tech stack:** Python, boto3
