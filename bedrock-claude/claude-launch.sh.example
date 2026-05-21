@@ -1,0 +1,17 @@
+#!/bin/bash
+# Copy to claude-launch.sh and fill in your values.
+# DO NOT commit claude-launch.sh — it contains credentials.
+#
+# Export only Redshift vars — do NOT export AWS credentials (breaks Claude Code OAuth auth)
+export REDSHIFT_HOST="your-cluster.xxxxxxxxxxxx.eu-west-1.redshift.amazonaws.com"
+export REDSHIFT_PORT="5439"
+export REDSHIFT_DB_NAME="your-database"
+export REDSHIFT_USER_NAME="your-db-user"
+export REDSHIFT_REGION="eu-west-1"
+
+VENV="$(dirname "$0")/app/.venv"
+export VIRTUAL_ENV="$VENV"
+export PATH="$VENV/bin:$HOME/.local/bin:$PATH"
+
+cd "$(dirname "$0")"
+exec claude --dangerously-skip-permissions "$@"

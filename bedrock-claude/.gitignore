@@ -1,0 +1,14 @@
+# Credentials — never commit
+.env
+claude-launch.sh
+
+# Local analysis artifacts created by Claude
+app/analysis/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# macOS
+.DS_Store

@@ -16,6 +16,9 @@ from typing import Any, Iterator
 
 import boto3
 from botocore.exceptions import ClientError
+from dotenv import find_dotenv, load_dotenv
+
+load_dotenv(find_dotenv(usecwd=True))
 
 
 def _cell_to_value(cell: dict[str, Any]) -> Any:
@@ -60,7 +63,7 @@ def execute_redshift_query(sql: str) -> list[dict[str, Any]]:
         sys.exit(1)
 
     rs_cluster = rs_host.split(".")[0] if "." in rs_host else rs_host
-    profile = os.environ.get("AWS_PROFILE", "default")
+    profile = os.environ.get("AWS_PROFILE")  # None → boto3 uses env var credentials
 
     session = boto3.Session(profile_name=profile, region_name=rs_region)
     client = session.client("redshift-data")

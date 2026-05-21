@@ -1,16 +1,21 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#     "boto3==1.38.24",
-#     "litellm==1.71.1",
-#     "marimo",
-# ]
-# ///
-
 import marimo
 
 __generated_with = "0.13.13"
 app = marimo.App(width="medium")
+
+
+@app.cell(hide_code=True)
+def _():
+    from pathlib import Path as _Path
+    from dotenv import load_dotenv as _load_dotenv
+    import base64 as _b64
+    _load_dotenv(_Path(__file__).parent.parent / ".env")
+    _logo_path = _Path(__file__).parent.parent / "unnamed.png"
+    logo_src = (
+        "data:image/png;base64," + _b64.b64encode(_logo_path.read_bytes()).decode()
+        if _logo_path.exists() else ""
+    )
+    return (logo_src,)
 
 
 @app.cell(hide_code=True)
@@ -20,275 +25,74 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(
-        r"""
-    # Text2SQL — Ask your database in plain English
-
-    Type a question about your data. Claude generates the SQL, executes it
-    against Redshift via the Data API, and returns the results.
-    """
-    )
+def _(mo, logo_src):
+    _logo_html = f'<img src="{logo_src}" style="height:48px;width:auto;display:block;margin-bottom:12px;" alt="logo" />' if logo_src else ""
+    mo.Html(f"""
+<style>
+  .rc-hero {{ color: #1f2937; margin: 0 0 24px; overflow: hidden; }}
+  .rc-hero__grid {{
+    align-items: stretch; display: grid; gap: 22px;
+    grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.6fr);
+    padding: 30px 28px;
+  }}
+  @media (max-width: 760px) {{
+    .rc-hero__grid {{ grid-template-columns: 1fr; padding: 24px 18px; }}
+    .rc-hero h1 {{ font-size: 1.9rem !important; }}
+  }}
+</style>
+<div class="rc-hero">
+  <div class="rc-hero__grid">
+    <div>
+      {_logo_html}
+      <h1 style="margin:0 0 10px;color:#111827;font-size:2.35rem;line-height:1.06;font-weight:850;">
+        RenCode - Text2SQL Self-Service
+      </h1>
+      <p style="margin:0;max-width:600px;color:#374151;font-size:1.05rem;line-height:1.52;">
+        Ask questions about your data in plain English. Claude generates the SQL,
+        executes it against Redshift via the Data API, and returns results — no SQL knowledge required.
+      </p>
+      <div style="margin-top:18px;color:#475569;font-size:0.92rem;">
+        Powered by <b style="color:#111827;">Claude</b> + <b style="color:#111827;">Redshift Data API</b>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:10px;border:1px solid rgba(148,163,184,0.35);background:rgba(255,255,255,0.62);border-radius:8px;padding:18px 16px;box-shadow:0 12px 30px rgba(148,163,184,0.13);">
+      <div style="color:#64748b;font-size:0.72rem;font-weight:850;text-transform:uppercase;margin-bottom:4px;">How it works</div>
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="min-width:22px;height:22px;border-radius:50%;background:#dcfce7;color:#15803d;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">1</div>
+        <div style="font-size:0.88rem;color:#374151;line-height:1.4;">Type your question in plain English</div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="min-width:22px;height:22px;border-radius:50%;background:#dcfce7;color:#15803d;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">2</div>
+        <div style="font-size:0.88rem;color:#374151;line-height:1.4;">Claude generates a read-only SQL query</div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="min-width:22px;height:22px;border-radius:50%;background:#dcfce7;color:#15803d;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">3</div>
+        <div style="font-size:0.88rem;color:#374151;line-height:1.4;">Results returned from Redshift via Data API</div>
+      </div>
+    </div>
+  </div>
+</div>
+""")
     return
 
 
-# ---------------------------------------------------------------------------
-# AWS credential check
-# ---------------------------------------------------------------------------
-@app.cell(hide_code=True)
-def _():
-    import os
-    import boto3
-
-    def check_aws_config():
-        has_creds = False
-        profile = os.environ.get("AWS_PROFILE", "")
-        try:
-            session = boto3.Session(
-                profile_name=profile if profile else None
-            )
-            credentials = session.get_credentials()
-            if credentials:
-                has_creds = True
-        except Exception:
-            pass
-        return {"has_credentials": has_creds}
-
-    aws_config = check_aws_config()
-    return (aws_config,)
-
-
-@app.cell(hide_code=True)
-def _(aws_config, mo):
-    mo.stop(
-        not aws_config["has_credentials"],
-        mo.md("""
-### AWS Credentials Not Found
-
-Configure credentials via one of:
-1. `export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...`
-2. `aws configure`
-3. Set `AWS_PROFILE` to a profile in `~/.aws/credentials`
-        """),
-    )
-    return
-
-
-# ---------------------------------------------------------------------------
-# Load schema context (for the LLM system prompt)
-# ---------------------------------------------------------------------------
-@app.cell(hide_code=True)
-def _():
-    from pathlib import Path
-
-    _schema_path = Path(__file__).parent / "schema" / "schema_context.md"
-    if _schema_path.exists():
-        schema_context = _schema_path.read_text()
-    else:
-        schema_context = "No schema context file found. Ask the user to describe the tables."
-    return (schema_context,)
-
-
-# ---------------------------------------------------------------------------
-# Configuration form
-# ---------------------------------------------------------------------------
 @app.cell(hide_code=True)
 def _(mo):
     import os as _os
-
-    model_options = [
-        "bedrock/converse/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "bedrock/converse/us.anthropic.claude-sonnet-4-6",
-        "bedrock/converse/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-    ]
-
-    region_options = [
-        "eu-west-1",
-        "us-east-1",
-        "us-west-2",
-        "eu-central-1",
-    ]
-
-    model = mo.ui.dropdown(
-        options=model_options, value=model_options[0], label="Bedrock Model"
-    )
-    region = mo.ui.dropdown(
-        options=region_options,
-        value=_os.environ.get("AWS_DEFAULT_REGION", "eu-west-1"),
-        label="AWS Region",
-    )
-    profile = mo.ui.text(
-        value=_os.environ.get("AWS_PROFILE", ""),
-        label="AWS Profile (optional)",
-        placeholder="Leave empty for default credentials",
-    )
-    max_rows = mo.ui.slider(10, 500, value=50, step=10, label="Max rows to display")
-
-    config_form = (
-        mo.md("""
-**Configuration**
-{model}
-{region}
-{profile}
-{max_rows}
-        """)
-        .batch(
-            model=model,
-            region=region,
-            profile=profile,
-            max_rows=max_rows,
-        )
-        .form(submit_button_label="Apply")
-    )
-
-    config_form
-    return (config_form,)
-
-
-# ---------------------------------------------------------------------------
-# Text2SQL chat model — custom handler that generates SQL, runs it, formats
-# ---------------------------------------------------------------------------
-@app.cell(hide_code=True)
-def _(config_form, mo, schema_context):
-    import json
-    import traceback
-    from litellm import completion
-
-    def _build_system_prompt(schema: str) -> str:
-        return f"""You are a SQL assistant. The user will ask questions about data.
-Your job is to write a read-only SQL query that answers their question.
-
-RULES:
-- Output ONLY a JSON object: {{"sql": "<your query>", "explanation": "<one-line explanation>"}}
-- SELECT queries only. Never write INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, or TRUNCATE.
-- Use standard SQL compatible with Amazon Redshift.
-- If the question is ambiguous, make a reasonable assumption and state it in the explanation.
-- Limit results to 200 rows unless the user asks for more.
-
-DATABASE SCHEMA:
-{schema}"""
-
-    def text2sql_handler(messages, config):
-        """Chat handler: take user question, generate SQL, execute, return results."""
-        if config_form.value is None:
-            return "Please submit the configuration form first."
-
-        cfg = config_form.value
-        bedrock_model = cfg["model"]
-        bedrock_region = cfg["region"]
-        bedrock_profile = cfg["profile"]
-        row_limit = cfg["max_rows"]
-
-        # Build messages for the LLM
-        system_prompt = _build_system_prompt(schema_context)
-        llm_messages = [{"role": "system", "content": system_prompt}]
-        for m in messages:
-            llm_messages.append({"role": m.role, "content": m.content})
-
-        # Call Bedrock via litellm
-        import os
-        os.environ["LITELLM_DROP_PARAMS"] = "True"
-        kwargs = {
-            "model": bedrock_model,
-            "messages": llm_messages,
-            "max_tokens": 1024,
-            "temperature": 0,
-            "aws_region_name": bedrock_region,
-        }
-        if bedrock_profile.strip():
-            kwargs["aws_profile_name"] = bedrock_profile.strip()
-
-        try:
-            resp = completion(**kwargs)
-            raw = resp.choices[0].message.content.strip()
-        except Exception as e:
-            return f"**Bedrock error:** {e}"
-
-        # Parse the JSON response
-        try:
-            # Handle markdown code blocks
-            cleaned = raw
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[1]
-                cleaned = cleaned.rsplit("```", 1)[0]
-            parsed = json.loads(cleaned)
-            sql = parsed["sql"]
-            explanation = parsed.get("explanation", "")
-        except (json.JSONDecodeError, KeyError):
-            return f"**Could not parse model response as JSON.**\n\nRaw output:\n```\n{raw}\n```"
-
-        # Safety check — reject non-SELECT
-        sql_upper = sql.strip().upper()
-        if not sql_upper.startswith("SELECT") and not sql_upper.startswith("WITH"):
-            return f"**Blocked:** Only SELECT / WITH queries are allowed.\n\nGenerated SQL:\n```sql\n{sql}\n```"
-
-        # Execute the query via Redshift Data API
-        try:
-            from db import execute_query
-            columns, rows = execute_query(sql)
-        except Exception as e:
-            return (
-                f"**Query failed:** `{e}`\n\n"
-                f"**SQL:**\n```sql\n{sql}\n```\n\n"
-                f"**Explanation:** {explanation}"
-            )
-
-        # Format results
-        if not columns:
-            return f"Query executed successfully (no result set).\n\n```sql\n{sql}\n```"
-
-        display_rows = rows[:row_limit]
-        header = "| " + " | ".join(columns) + " |"
-        separator = "| " + " | ".join("---" for _ in columns) + " |"
-        body = "\n".join(
-            "| " + " | ".join(str(v) if v is not None else "" for v in row) + " |"
-            for row in display_rows
-        )
-        truncation = ""
-        if len(rows) > row_limit:
-            truncation = f"\n\n*Showing {row_limit} of {len(rows)} rows.*"
-
-        return (
-            f"**{explanation}**\n\n"
-            f"```sql\n{sql}\n```\n\n"
-            f"{header}\n{separator}\n{body}{truncation}"
-        )
-
-    # Render the chat widget
-    mo.stop(
-        config_form.value is None,
-        mo.md("Submit the configuration above to start."),
-    )
-
-    chatbot = mo.ui.chat(
-        text2sql_handler,
-        prompts=[
-            "How many customers do we have by country?",
-            "What are the top 5 products by revenue?",
-            "Show me monthly order totals for 2024",
-            "Which customers have never placed an order?",
-        ],
-        max_height=600,
-    )
-    chatbot
-    return
-
-
-# ---------------------------------------------------------------------------
-# Footer
-# ---------------------------------------------------------------------------
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(
-        r"""
----
-
-**Architecture:** User question → Claude (Bedrock) generates SQL →
-SQL executed against Redshift (Data API) → results displayed.
-
-All Bedrock calls logged in CloudTrail. Redshift access is read-only, scoped to the configured DbUser.
-    """
-    )
+    _ttyd_url = _os.environ.get("TTYD_URL", "http://localhost:7681")
+    mo.Html(f"""
+<iframe
+  id="ttyd-frame"
+  src="{_ttyd_url}"
+  style="width:100%;height:600px;border:none;border-radius:8px;"
+  allow="keyboard"
+></iframe>
+<script>
+  const frame = document.getElementById('ttyd-frame');
+  frame.addEventListener('load', () => {{ frame.contentWindow.focus(); }});
+  frame.addEventListener('click', () => {{ frame.contentWindow.focus(); }});
+</script>
+""")
     return
 
 
