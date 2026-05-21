@@ -36,3 +36,31 @@ A generic Python package that ports AWS AppConfig Agent behavior:
 - Includes cache + backup fallback logic for resilient reads
 
 **Tech stack:** Python, boto3
+
+### [bedrock-claude](./bedrock-claude)
+
+A self-service Text2SQL demo that lets non-technical users query a Redshift data warehouse in plain English.
+
+**How it works:**
+- User types a question in the browser
+- Claude Code generates a read-only SQL query and executes it via the Redshift Data API
+- Results are returned and summarized directly in the terminal
+
+**Features:**
+- Marimo web app with embedded Claude Code terminal (via ttyd + xterm.js)
+- Redshift Data API — no VPN, no direct DB connection required
+- Dockerfile for EC2 deployment; AWS credentials via IAM role
+- No credentials in code — `.env` and `claude-launch.sh` are gitignored
+
+**Quick start:**
+
+```bash
+cd bedrock-claude
+cp .env.example .env          # fill in Redshift vars
+cp claude-launch.sh.example claude-launch.sh  # fill in same vars
+uv venv app/.venv && uv pip install --python app/.venv marimo boto3 python-dotenv pandas
+ttyd -p 7681 -W ./claude-launch.sh &
+marimo run app/text2sql.py --port 2718
+```
+
+**Tech stack:** Python, Marimo, Claude Code, Redshift Data API, boto3, ttyd, Docker
