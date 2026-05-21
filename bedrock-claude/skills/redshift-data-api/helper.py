@@ -6,7 +6,7 @@ Usage:
 
 Env vars required:
     REDSHIFT_REGION, REDSHIFT_HOST, REDSHIFT_DB_NAME, REDSHIFT_USER_NAME
-    AWS_PROFILE (optional, defaults to "renmoney-prod")
+    AWS_PROFILE (optional, defaults to "default")
 """
 
 import os
@@ -60,7 +60,7 @@ def execute_redshift_query(sql: str) -> list[dict[str, Any]]:
         sys.exit(1)
 
     rs_cluster = rs_host.split(".")[0] if "." in rs_host else rs_host
-    profile = os.environ.get("AWS_PROFILE", "renmoney-prod")
+    profile = os.environ.get("AWS_PROFILE", "default")
 
     session = boto3.Session(profile_name=profile, region_name=rs_region)
     client = session.client("redshift-data")
