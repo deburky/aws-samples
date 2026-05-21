@@ -382,6 +382,8 @@ def evaluate_config(
         variants: list[dict[str, Any]] = flag_value.get("_variants", [])
 
         for variant in variants:
+            if not variant.get("enabled", True):
+                continue
             rule = variant.get("rule")
 
             if rule is None or evaluate_rule(rule, context):
