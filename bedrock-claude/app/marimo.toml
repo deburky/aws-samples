@@ -1,0 +1,14 @@
+marimo.toml
+[ai.open_ai]
+model = "bedrock/anthropic.claude-3-sonnet-20240229"
+# Models are identified by bedrock/provider.model_name
+# Examples:
+# - bedrock/anthropic.claude-3-sonnet-20240229
+# - bedrock/meta.llama3-8b-instruct-v1:0
+# - bedrock/amazon.titan-text-express-v1
+# - bedrock/cohere.command-r-plus-v1
+
+[ai.bedrock]
+region_name = "us-east-1" # AWS region where Bedrock is available
+# Optional AWS profile name (from ~/.aws/credentials)
+profile_name = "default"

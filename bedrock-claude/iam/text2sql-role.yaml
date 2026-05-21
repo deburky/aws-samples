@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  IAM role for Text2SQL users — grants Bedrock model invocation
+  and read-only Redshift access via the Data API.
+
+Parameters:
+  RedshiftClusterIdentifier:
+    Type: String
+    Description: Redshift cluster identifier (e.g. my-cluster)
+  RedshiftDatabaseName:
+    Type: String
+    Description: Redshift database name
+  RedshiftDbUser:
+    Type: String
+    Description: Redshift database user for temporary credentials
+    Default: readonly_user
+  BedrockRegion:
+    Type: String
+    Description: AWS region where Bedrock models are enabled
+    Default: eu-west-1
+    AllowedValues:
+      - eu-west-1
+      - us-east-1
+      - us-west-2
+      - eu-central-1
+
+Resources:
+  Text2SQLRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Text2SQL-User
+      Description: Read-only Bedrock + Redshift access for text2sql
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockInvoke
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: InvokeClaude
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub "arn:aws:bedrock:${BedrockRegion}::foundation-model/anthropic.claude-*"
+                  - !Sub "arn:aws:bedrock:${BedrockRegion}::foundation-model/us.anthropic.claude-*"
+
+        - PolicyName: RedshiftDataAPI
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ExecuteAndDescribe
+                Effect: Allow
+                Action:
+                  - redshift-data:ExecuteStatement
+                  - redshift-data:DescribeStatement
+                  - redshift-data:GetStatementResult
+                  - redshift-data:CancelStatement
+                  - redshift-data:ListStatements
+                Resource: "*"
+              - Sid: TempCredentials
+                Effect: Allow
+                Action:
+                  - redshift:GetClusterCredentials
+                Resource:
+                  - !Sub "arn:aws:redshift:${BedrockRegion}:${AWS::AccountId}:dbuser:${RedshiftClusterIdentifier}/${RedshiftDbUser}"
+                  - !Sub "arn:aws:redshift:${BedrockRegion}:${AWS::AccountId}:dbname:${RedshiftClusterIdentifier}/${RedshiftDatabaseName}"
+
+Outputs:
+  RoleArn:
+    Description: ARN of the Text2SQL IAM role
+    Value: !GetAtt Text2SQLRole.Arn
+  AssumeRoleCommand:
+    Description: CLI command for users to assume this role
+    Value: !Sub "aws sts assume-role --role-arn ${Text2SQLRole.Arn} --role-session-name text2sql"
