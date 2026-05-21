@@ -8,14 +8,8 @@ app = marimo.App(width="medium")
 def _():
     from pathlib import Path as _Path
     from dotenv import load_dotenv as _load_dotenv
-    import base64 as _b64
     _load_dotenv(_Path(__file__).parent.parent / ".env")
-    _logo_path = _Path(__file__).parent.parent / "unnamed.png"
-    logo_src = (
-        "data:image/png;base64," + _b64.b64encode(_logo_path.read_bytes()).decode()
-        if _logo_path.exists() else ""
-    )
-    return (logo_src,)
+    return
 
 
 @app.cell(hide_code=True)
@@ -25,8 +19,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(mo, logo_src):
-    _logo_html = f'<img src="{logo_src}" style="height:48px;width:auto;display:block;margin-bottom:12px;" alt="logo" />' if logo_src else ""
+def _(mo):
     mo.Html(f"""
 <style>
   .rc-hero {{ color: #1f2937; margin: 0 0 24px; overflow: hidden; }}
@@ -43,7 +36,6 @@ def _(mo, logo_src):
 <div class="rc-hero">
   <div class="rc-hero__grid">
     <div>
-      {_logo_html}
       <h1 style="margin:0 0 10px;color:#111827;font-size:2.35rem;line-height:1.06;font-weight:850;">
         RenCode - Text2SQL Self-Service
       </h1>
