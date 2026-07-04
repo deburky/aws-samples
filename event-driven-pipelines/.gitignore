@@ -1,0 +1,35 @@
+# AWS SAM build artifacts
+.aws-sam/
+samconfig-local.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# dlt local state / pipeline output
+.dlt/
+edp_out/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Docs (local-only)
+docs/

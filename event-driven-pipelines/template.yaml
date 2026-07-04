@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Event-driven pipeline: S3 Inventory -> Lambda -> dlt normalize -> Amazon S3 Table.
+  Files land in a source bucket, a daily inventory manifest triggers the function,
+  and dlt normalizes the listed JSON into an evolving-schema S3 Table.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    Timeout: 600
+    MemorySize: 2048
+
+Resources:
+
+  # Managed Iceberg storage for the normalized output.
+  TableBucket:
+    Type: AWS::S3Tables::TableBucket
+    Properties:
+      TableBucketName: edp-tables
+
+  # Source bucket: JSON files under data/, inventory manifests under inventory/.
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "edp-source-${AWS::AccountId}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-inventory
+            Status: Enabled
+            Prefix: inventory/
+            ExpirationInDays: 7
+      InventoryConfigurations:
+        - Id: edp-daily
+          Enabled: true
+          IncludedObjectVersions: Current
+          ScheduleFrequency: Daily
+          Prefix: data/
+          OptionalFields: [Size, LastModifiedDate]
+          Destination:
+            BucketArn: !Sub "arn:aws:s3:::edp-source-${AWS::AccountId}"
+            Format: CSV
+            Prefix: inventory
+
+  # Let the S3 Inventory service write manifests into inventory/.
+  SourceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SourceBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: InventoryWrite
+            Effect: Allow
+            Principal: {Service: s3.amazonaws.com}
+            Action: s3:PutObject
+            Resource: !Sub "arn:aws:s3:::edp-source-${AWS::AccountId}/inventory/*"
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+                s3:x-amz-acl: bucket-owner-full-control
+              ArnLike:
+                aws:SourceArn: !Sub "arn:aws:s3:::edp-source-${AWS::AccountId}"
+
+  # The function: an inventory manifest.json arrives -> normalize its JSON to the S3 Table.
+  NormalizeFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python-uv
+    Properties:
+      CodeUri: lambda/
+      Handler: handler.handler
+      Environment:
+        Variables:
+          S3TABLES_WAREHOUSE: !GetAtt TableBucket.TableBucketARN
+          S3TABLES_NAMESPACE: raw
+          TARGET_TABLE: applications
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Sub "edp-source-${AWS::AccountId}"
+        # broad for the demo; scope to the table bucket + its data location in production.
+        - Statement:
+            - Effect: Allow
+              Action: s3tables:*
+              Resource: "*"
+            - Effect: Allow
+              Action: [s3:GetObject, s3:PutObject, s3:ListBucket]
+              Resource: "*"
+      Events:
+        InventoryManifest:
+          Type: S3
+          Properties:
+            Bucket: !Ref SourceBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - {Name: prefix, Value: inventory/}
+                  - {Name: suffix, Value: manifest.json}
+
+Outputs:
+  SourceBucketName:
+    Description: Drop JSON files under data/ here
+    Value: !Ref SourceBucket
+  TableBucketArn:
+    Description: The S3 Tables warehouse the normalized data lands in
+    Value: !GetAtt TableBucket.TableBucketARN
+  FunctionName:
+    Value: !Ref NormalizeFunction
